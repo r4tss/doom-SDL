@@ -2,7 +2,7 @@
 #include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
 #include <math.h>
-// TODO FIRSST get rendering and movement around map working.
+// TODO FIRSST get rendering and movement around map working. DONE
 
 // TODO Enemies, Load maps. Weapons
 
@@ -239,8 +239,11 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
               player.angle -= 2 * M_PI;
           }
 
-        player.x += acceleration * cos(player.angle);
-        player.y += acceleration * sin(player.angle);
+        if(map[(int)(player.x + acceleration * cos(player.angle))][(int)(player.y + acceleration * sin(player.angle))].type == 0)
+          {
+            player.x += acceleration * cos(player.angle);
+            player.y += acceleration * sin(player.angle);
+          }
         if(acceleration > 0.0)
           acceleration -= 0.1;
         else if(acceleration < 0.0)
