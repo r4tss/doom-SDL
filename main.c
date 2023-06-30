@@ -130,9 +130,9 @@ float shootRay(float xDir, float yDir, float x, float y, float angle, float base
     float vdistance = sqrt(pow(fabs(vx - x), 2) + pow(fabs(vy - y), 2)), hdistance = sqrt(pow(fabs(hx - x), 2) + pow(fabs(hy - y), 2));
     if(vdistance < hdistance)
       {
-        if((fabs(ceil(vx) - vx) < 0.05) && (fabs(ceil(vy) - vy) < 0.05))
-          *type = 0;
-        else if(xDir < 0.0)
+        //if((fabs(ceil(vx) - vx) < 0.05) && (fabs(ceil(vy) - vy) < 0.05))
+        //  *type = 0;
+        if(xDir < 0.0)
           *type = map[(int)vx - 1][(int)vy].type;
         else
           *type = map[(int)vx][(int)vy].type;
@@ -140,9 +140,9 @@ float shootRay(float xDir, float yDir, float x, float y, float angle, float base
       }
     else
       {
-        if((fabs(ceil(hx) -hx) < 0.05) && (fabs(ceil(hy) - hy) < 0.05))
-          *type = 0;
-        else if(yDir < 0.0)
+        //if((fabs(ceil(hx) -hx) < 0.05) && (fabs(ceil(hy) - hy) < 0.05))
+        //  *type = 0;
+        if(yDir < 0.0)
           *type = map[(int)hx][(int)hy - 1].type;
         else
           *type = map[(int)hx][(int)hy].type;
@@ -153,8 +153,8 @@ float shootRay(float xDir, float yDir, float x, float y, float angle, float base
 bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, struct Tile map[map_w][map_h])
   {
     int framerate = 30, ticksPerFrame = 1000/framerate, startFrame = 0, ray_n = 150;
-    float fov = 90 * (M_PI/180), angle_step = fov/ray_n, map_depth = sqrt(pow(map_w, 2) + pow(map_h, 2));
-    bool end = false;
+    float fov = 90 * (M_PI/180), angle_step = fov/ray_n, map_depth = sqrt(pow(map_w, 2) + pow(map_h, 2)), acceleration = 0.0;
+    bool end = false, keys[323] = {false};
 
     SDL_Rect floor;
     floor.w = 640;
@@ -176,8 +176,8 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
       }
 
     struct Player player;
-    player.x = 3.5;
-    player.y = 3.5;
+    player.x = 3.9;
+    player.y = 3.9;
     player.angle = 0.0;
     player.health = 10;
 
@@ -190,7 +190,7 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
         startFrame = SDL_GetTicks();
         SDL_RenderClear(renderer);
 
-        // Make player shoot out rays from position with an FoV of 60 degrees
+        // Make player shoot out rays from position with an FoV of 60 degrees DONE
         for(int i = 0;i <= ray_n;i++)
           {
             ray[i].angle = player.angle - (fov / 2) + (angle_step * i);
@@ -206,33 +206,47 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
             switch(event.type)
               {
                 case SDL_KEYDOWN:
-                  switch(event.key.keysym.sym)
-                    {
-                      case SDLK_w:
-                        player.x += cos(player.angle);
-                        player.y += sin(player.angle);
-                        break;
-                      case SDLK_s:
-                        player.x -= cos(player.angle);
-                        player.y -= sin(player.angle);
-                        break;
-                      case SDLK_a:
-                        player.angle -= 5 * angle_step;
-                        if(player.angle < 0)
-                          player.angle += 2 * M_PI;
-                        break;
-                      case SDLK_d:
-                        player.angle += 5 * angle_step;
-                        if(player.angle > 2 * M_PI)
-                          player.angle -= 2 * M_PI;
-                        break;
-                    }
+                  keys[event.key.keysym.sym] = true;
+                  break;
+                case SDL_KEYUP:
+                  keys[event.key.keysym.sym] = false;
                   break;
                 case SDL_QUIT:
                   return true;
                   break;
               }
           }
+        if(keys[SDLK_w])
+          {
+            if(acceleration < 0.5)
+              acceleration += 0.1;
+           }
+        if(keys[SDLK_s])
+          {
+            if(acceleration > -0.5)
+              acceleration -= 0.1;
+          }
+        if(keys[SDLK_a])
+          {
+            player.angle -= 5 * angle_step;
+            if(player.angle < 0.0)
+              player.angle += 2 * M_PI;
+          }
+        if(keys[SDLK_d])
+          {
+            player.angle += 5 * angle_step;
+            if(player.angle > 2 * M_PI)
+              player.angle -= 2 * M_PI;
+          }
+
+        player.x += acceleration * cos(player.angle);
+        player.y += acceleration * sin(player.angle);
+        if(acceleration > 0.0)
+          acceleration -= 0.1;
+        else if(acceleration < 0.0)
+          acceleration += 0.1;
+        if(acceleration < 0.01 && acceleration > -0.01)
+          acceleration = 0.0;
 
         /*          --- RENDERING ---          */
         SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
@@ -261,7 +275,7 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
         for(int i = 0;i <= ray_n;i++)
           {
             rayDisplay[i].w = 640 / ray_n;
-            rayDisplay[i].h = 300 / ray[i].distance;
+            rayDisplay[i].h = 400 / ray[i].distance;
             rayDisplay[i].x = i * (640 / ray_n);
             rayDisplay[i].y = 240 - (rayDisplay[i].h / 2);
             if(ray[i].type == 0)
@@ -323,4 +337,8 @@ int main()
       {
         quit = gameLoop(map_w, map_h, renderer, event, map);
       }
+
+    SDL_DestroyRenderer(renderer);
+    SDL_DestroyWindow(window);
+    return 0;
   }
