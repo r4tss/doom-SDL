@@ -2,9 +2,17 @@
 #include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
 #include <math.h>
-// TODO FIRSST get rendering and movement around map working. DONE
+// TODO FIRSST get rendering and movement around map working. DONE DONE DONE
+
+// Improving movement with strafing.
 
 // TODO Enemies, Load maps. Weapons
+
+// Map loading - needs to save maps to files. Maybe implement a map editor
+
+// Enemies - Some kind of AI? gotta shoot at you and do damage. Maybe less chance to hit when moving
+
+// Weapons - need some sort of graphic for different weapon types. Have to shoot and be able to hit things. Hitboxes for enemies and such.
 
 struct Tile
 {
@@ -150,17 +158,13 @@ float shootRay(float xDir, float yDir, float x, float y, float angle, float base
       }
   }
 
-bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, struct Tile map[map_w][map_h])
+bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, SDL_Window* window, struct Tile map[map_w][map_h])
   {
     int framerate = 30, ticksPerFrame = 1000/framerate, startFrame = 0, ray_n = 150;
-    float fov = 90 * (M_PI/180), angle_step = fov/ray_n, map_depth = sqrt(pow(map_w, 2) + pow(map_h, 2)), acceleration = 0.0;
+    float fov = 90 * (M_PI/180), angle_step = fov/ray_n, map_depth = sqrt(pow(map_w, 2) + pow(map_h, 2)), acceleration = 0.0, sideAcceleration = 0.0, mouseMovement;
     bool end = false;
 
-    SDL_Rect floor;
-    floor.w = 640;
-    floor.h = 240;
-    floor.x = 0;
-    floor.y = 240;
+    SDL_Rect floor = {0, 240, 640, 240};
 
     // Make minimap squares 60x60 pixels. DONE
     SDL_Rect minimap[map_w][map_h];
@@ -176,8 +180,8 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
       }
 
     struct Player player;
-    player.x = 3.9;
-    player.y = 3.9;
+    player.x = 3.95;
+    player.y = 3.95;
     player.angle = 0.0;
     player.health = 10;
 
@@ -189,6 +193,7 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
       {
         startFrame = SDL_GetTicks();
         SDL_RenderClear(renderer);
+        SDL_WarpMouseInWindow(window, 320, 240);
 
         // Make player shoot out rays from position with an FoV of 60 degrees DONE
         for(int i = 0;i <= ray_n;i++)
@@ -205,17 +210,16 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
           {
             switch(event.type)
               {
-                //case SDL_KEYDOWN:
-                //  keys[event.key.keysym.sym] = true;
-                //  break;
-                //case SDL_KEYUP:
-                //  keys[event.key.keysym.sym] = false;
-                //  break;
+                case SDL_MOUSEMOTION:
+                  mouseMovement = (float)event.motion.xrel;
+                  break;
                 case SDL_QUIT:
                   return true;
                   break;
               }
           }
+        if(mouseMovement > 10.0 || mouseMovement < -10.0)
+          player.angle += mouseMovement / 500;
         const Uint8* keys = SDL_GetKeyboardState(NULL);
         if(keys[SDL_SCANCODE_W])
           {
@@ -229,11 +233,21 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
           }
         if(keys[SDL_SCANCODE_A])
           {
+            if(sideAcceleration < 0.5)
+              sideAcceleration -= 0.1;
+          }
+        if(keys[SDL_SCANCODE_D])
+          {
+            if(sideAcceleration > -0.5)
+              sideAcceleration += 0.1;
+          }
+        if(keys[SDL_SCANCODE_Q])
+          {
             player.angle -= 5 * angle_step;
             if(player.angle < 0.0)
               player.angle += 2 * M_PI;
           }
-        if(keys[SDL_SCANCODE_D])
+        if(keys[SDL_SCANCODE_E])
           {
             player.angle += 5 * angle_step;
             if(player.angle > 2 * M_PI)
@@ -245,12 +259,24 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
             player.x += acceleration * cos(player.angle);
             player.y += acceleration * sin(player.angle);
           }
+        if(map[(int)(player.x + sideAcceleration * cos(player.angle + M_PI_2))][(int)(player.y + sideAcceleration * sin(player.angle + M_PI_2))].type == 0)
+          {
+            player.x += sideAcceleration * cos(player.angle + M_PI_2);
+            player.y += sideAcceleration * sin(player.angle + M_PI_2);
+          }
         if(acceleration > 0.0)
           acceleration -= 0.1;
         else if(acceleration < 0.0)
           acceleration += 0.1;
         if(acceleration < 0.01 && acceleration > -0.01)
           acceleration = 0.0;
+
+        if(sideAcceleration > 0.0)
+          sideAcceleration -= 0.1;
+        else if(sideAcceleration < 0.0)
+          sideAcceleration += 0.1;
+        if(sideAcceleration < 0.01 && sideAcceleration > -0.01)
+          sideAcceleration = 0.0;
 
         /*          --- RENDERING ---          */
         SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
@@ -292,7 +318,7 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
               SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
             SDL_RenderFillRect(renderer, &rayDisplay[i]);
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-            SDL_RenderDrawLine(renderer, (player.x * 60) + 640, player.y * 60, ((player.x + cos(ray[i].angle) * ray[i].distance) * 60) + 640, (player.y + sin(ray[i].angle) * ray[i].distance) * 60);
+            SDL_RenderDrawLine(renderer, (player.x * 60) + 640, player.y * 60, ((player.x + cos(ray[i].angle) * (ray[i].distance / cos(ray[i].angle - player.angle))) * 60) + 640, (player.y + sin(ray[i].angle) * (ray[i].distance / cos(ray[i].angle - player.angle))) * 60);
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
           }
 
@@ -337,9 +363,11 @@ int main()
     window = SDL_CreateWindow("Doom", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640 + 480, 480, SDL_WINDOW_OPENGL);
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
+    SDL_SetRelativeMouseMode(SDL_TRUE);
+
     while(!quit)
       {
-        quit = gameLoop(map_w, map_h, renderer, event, map);
+        quit = gameLoop(map_w, map_h, renderer, event, window, map);
       }
 
     SDL_DestroyRenderer(renderer);
