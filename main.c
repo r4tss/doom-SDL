@@ -154,7 +154,7 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
   {
     int framerate = 30, ticksPerFrame = 1000/framerate, startFrame = 0, ray_n = 150;
     float fov = 90 * (M_PI/180), angle_step = fov/ray_n, map_depth = sqrt(pow(map_w, 2) + pow(map_h, 2)), acceleration = 0.0;
-    bool end = false, keys[323] = {false};
+    bool end = false;
 
     SDL_Rect floor;
     floor.w = 640;
@@ -205,34 +205,35 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, str
           {
             switch(event.type)
               {
-                case SDL_KEYDOWN:
-                  keys[event.key.keysym.sym] = true;
-                  break;
-                case SDL_KEYUP:
-                  keys[event.key.keysym.sym] = false;
-                  break;
+                //case SDL_KEYDOWN:
+                //  keys[event.key.keysym.sym] = true;
+                //  break;
+                //case SDL_KEYUP:
+                //  keys[event.key.keysym.sym] = false;
+                //  break;
                 case SDL_QUIT:
                   return true;
                   break;
               }
           }
-        if(keys[SDLK_w])
+        const Uint8* keys = SDL_GetKeyboardState(NULL);
+        if(keys[SDL_SCANCODE_W])
           {
             if(acceleration < 0.5)
               acceleration += 0.1;
            }
-        if(keys[SDLK_s])
+        if(keys[SDL_SCANCODE_S])
           {
             if(acceleration > -0.5)
               acceleration -= 0.1;
           }
-        if(keys[SDLK_a])
+        if(keys[SDL_SCANCODE_A])
           {
             player.angle -= 5 * angle_step;
             if(player.angle < 0.0)
               player.angle += 2 * M_PI;
           }
-        if(keys[SDLK_d])
+        if(keys[SDL_SCANCODE_D])
           {
             player.angle += 5 * angle_step;
             if(player.angle > 2 * M_PI)
@@ -343,5 +344,6 @@ int main()
 
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
+    SDL_Quit();
     return 0;
   }
