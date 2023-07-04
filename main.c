@@ -1,7 +1,12 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
+#include <stdio.h>
 #include <math.h>
+
+#define WINDOW_WIDTH 1920
+#define WINDOW_HEIGHT 1088
+
 // TODO FIRSST get rendering and movement around map working. DONE DONE DONE
 
 // Improving movement with strafing.
@@ -36,6 +41,44 @@ struct Ray
   float distance;
   int type;
 };
+
+void printText(SDL_Renderer *renderer, TTF_Font *font, char *str, int x, int y, int h, int r, int g, int b)
+  {
+    SDL_Color c = {r, g, b, 255};
+
+    SDL_Surface *s = TTF_RenderText_Solid(font, str, c);
+    SDL_Texture *t = SDL_CreateTextureFromSurface(renderer, s);
+
+    SDL_Rect rect = {x, y, strlen(str) * (h / 2), h};
+
+    SDL_RenderCopy(renderer, t, NULL, &rect);
+  }
+
+void loadMap(char *file, int map_w, int map_h, struct Tile map[map_w][map_h])
+{
+  FILE *f;
+  char mapString[64];
+  f = fopen(file, "r");
+
+  fgets(mapString, 64, f);
+
+  int ch = getc(f), x = 0, y = 0;
+  while(ch != EOF)
+  {
+    printf("%c", ch);
+    if(ch == '\n')
+    {
+      y++;
+      x = 0;
+    }
+    else
+    {
+      map[x][y].type = ch - '0';
+      x++;
+    }
+    ch = getc(f);
+  }
+}
 
 float shootRay(float xDir, float yDir, float x, float y, float angle, float baseAngle, float map_depth, int map_w, int map_h, struct Tile map[map_w][map_h], int *type)
   {
@@ -160,11 +203,12 @@ float shootRay(float xDir, float yDir, float x, float y, float angle, float base
 
 bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, SDL_Window* window, struct Tile map[map_w][map_h])
   {
-    int framerate = 30, ticksPerFrame = 1000/framerate, startFrame = 0, ray_n = 150;
+    int framerate = 30, ticksPerFrame = 1000/framerate, startFrame = 0, ray_n = WINDOW_WIDTH / 2;
     float fov = 90 * (M_PI/180), angle_step = fov/ray_n, map_depth = sqrt(pow(map_w, 2) + pow(map_h, 2)), acceleration = 0.0, sideAcceleration = 0.0, mouseMovement;
     bool end = false;
 
-    SDL_Rect floor = {0, 240, 640, 240};
+    SDL_Rect floor = {0, WINDOW_HEIGHT / 2, WINDOW_WIDTH, WINDOW_HEIGHT / 2};
+    SDL_Rect skybox = {0, 0, WINDOW_WIDTH, WINDOW_HEIGHT / 2};
 
     // Make minimap squares 60x60 pixels. DONE
     SDL_Rect minimap[map_w][map_h];
@@ -172,10 +216,10 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, SDL
       {
         for(int x = 0;x < map_w;x++)
           {
-            minimap[x][y].x = x * 60 + 640;
-            minimap[x][y].y = y * 60;
-            minimap[x][y].w = 60;
-            minimap[x][y].h = 60;
+            minimap[x][y].x = x * 34 + WINDOW_WIDTH;
+            minimap[x][y].y = y * 34;
+            minimap[x][y].w = 34;
+            minimap[x][y].h = 34;
           }
       }
 
@@ -193,7 +237,6 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, SDL
       {
         startFrame = SDL_GetTicks();
         SDL_RenderClear(renderer);
-        SDL_WarpMouseInWindow(window, 320, 240);
 
         // Make player shoot out rays from position with an FoV of 60 degrees DONE
         for(int i = 0;i <= ray_n;i++)
@@ -206,6 +249,7 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, SDL
           }
 
         /*          --- CONTROLS ---          */
+        mouseMovement = 0;
         while(SDL_PollEvent(&event))
           {
             switch(event.type)
@@ -218,8 +262,7 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, SDL
                   break;
               }
           }
-        if(mouseMovement > 10.0 || mouseMovement < -10.0)
-          player.angle += mouseMovement / 500;
+        player.angle += mouseMovement / 25;
         const Uint8* keys = SDL_GetKeyboardState(NULL);
         if(keys[SDL_SCANCODE_W])
           {
@@ -279,6 +322,8 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, SDL
           sideAcceleration = 0.0;
 
         /*          --- RENDERING ---          */
+        SDL_SetRenderDrawColor(renderer, 0, 213, 255, 255);
+        SDL_RenderFillRect(renderer, &skybox);
         SDL_SetRenderDrawColor(renderer, 100, 100, 100, 255);
         SDL_RenderFillRect(renderer, &floor);
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
@@ -296,21 +341,21 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, SDL
                   SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
                 SDL_RenderFillRect(renderer, &minimap[x][y]);
                 SDL_SetRenderDrawColor(renderer, 100, 100, 100, 50);
-                SDL_RenderDrawLine(renderer, (x * 60) + 640, y * 60, (x * 60) + 700, y * 60);
-                SDL_RenderDrawLine(renderer, (x * 60) + 640, y * 60, (x * 60) + 640, (y * 60) + 60);
+                SDL_RenderDrawLine(renderer, (x * 34) + WINDOW_WIDTH, y * 34, (x * 34) + 1920 + 34, y * 34);
+                SDL_RenderDrawLine(renderer, (x * 34) + WINDOW_WIDTH, y * 34, (x * 34) + WINDOW_WIDTH, (y * 34) + 34);
                 SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
               }
           }
 
         for(int i = 0;i <= ray_n;i++)
           {
-            rayDisplay[i].w = 640 / ray_n;
-            rayDisplay[i].h = 400 / ray[i].distance;
-            rayDisplay[i].x = i * (640 / ray_n);
-            rayDisplay[i].y = 240 - (rayDisplay[i].h / 2);
-            if(ray[i].type == 0)
-              SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
-            else if(ray[i].type == 1)
+            rayDisplay[i].w = 2;
+            rayDisplay[i].h = 800 / ray[i].distance;
+            rayDisplay[i].x = i * 2;
+            rayDisplay[i].y = WINDOW_HEIGHT / 2 - (rayDisplay[i].h / 2);
+            //if(ray[i].type == 0)
+            //  SDL_SetRenderDrawColor(renderer, 50, 50, 50, 255);
+            if(ray[i].type == 1)
               SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
             else if(ray[i].type == 2)
               SDL_SetRenderDrawColor(renderer, 0, 255, 0, 255);
@@ -318,12 +363,12 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, SDL
               SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
             SDL_RenderFillRect(renderer, &rayDisplay[i]);
             SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
-            SDL_RenderDrawLine(renderer, (player.x * 60) + 640, player.y * 60, ((player.x + cos(ray[i].angle) * (ray[i].distance / cos(ray[i].angle - player.angle))) * 60) + 640, (player.y + sin(ray[i].angle) * (ray[i].distance / cos(ray[i].angle - player.angle))) * 60);
+            SDL_RenderDrawLine(renderer, (player.x * 34) + WINDOW_WIDTH, player.y * 34, ((player.x + cos(ray[i].angle) * (ray[i].distance / cos(ray[i].angle - player.angle))) * 34) + WINDOW_WIDTH, (player.y + sin(ray[i].angle) * (ray[i].distance / cos(ray[i].angle - player.angle))) * 34);
             SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
           }
 
         SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-        SDL_RenderDrawLine(renderer, (player.x * 60) + 640, player.y * 60, ((player.x + cos(player.angle)) * 60) + 640, (player.y + sin(player.angle)) * 60);
+        //SDL_RenderDrawLine(renderer, (player.x * 60) + WINDOW_WIDTH, player.y * 60, ((player.x + cos(player.angle)) * 60) + WINDOW_WIDTH, (player.y + sin(player.angle)) * 60);
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderPresent(renderer);
         int ticks = startFrame - SDL_GetTicks();
@@ -335,23 +380,26 @@ bool gameLoop(int map_w, int map_h, SDL_Renderer *renderer, SDL_Event event, SDL
 
 int main()
   {
-    int map_w = 8, map_h = 8;
+    int map_w = 32, map_h = 32;
     struct Tile map[map_w][map_h];
     bool quit = false;
-    for(int y = 0;y < map_h;y++)
-      {
-        for(int x = 0;x < map_w;x++)
-          {
-            if(x == 0 || x == map_w - 1 || y == 0 || y == map_h - 1)
-              map[x][y].type = 1;
-            else if(x == 3 && y == 5)
-              map[x][y].type = 2;
-            else if(x == 2 && y >= 2 && y <= 6)
-              map[x][y].type = 3;
-            else
-              map[x][y].type = 0;
-          }
-      }
+
+    //for(int y = 0;y < map_h;y++)
+    //  {
+    //    for(int x = 0;x < map_w;x++)
+    //      {
+    //        if(x == 0 || x == map_w - 1 || y == 0 || y == map_h - 1)
+    //          map[x][y].type = 1;
+    //        else if(x == 3 && y == 5)
+    //          map[x][y].type = 2;
+    //        else if(x == 2 && y >= 2 && y <= 6)
+    //          map[x][y].type = 3;
+    //        else
+    //          map[x][y].type = 0;
+    //      }
+    //  }
+
+    loadMap("./maps/test-lineless.map", map_w, map_h, map);
 
     SDL_Window *window;
     SDL_Renderer *renderer;
@@ -360,7 +408,7 @@ int main()
     SDL_Init(SDL_INIT_VIDEO);
     TTF_Init();
 
-    window = SDL_CreateWindow("Doom", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 640 + 480, 480, SDL_WINDOW_OPENGL);
+    window = SDL_CreateWindow("Doom", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH + 1088, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
     renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
     SDL_SetRelativeMouseMode(SDL_TRUE);

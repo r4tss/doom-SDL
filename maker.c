@@ -1,6 +1,7 @@
 #include <SDL2/SDL.h>
 #include <SDL2/SDL_ttf.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 #define WINDOW_SIDE 800
 
@@ -9,14 +10,14 @@ struct Tile
   int type;
 };
 
-void printText(SDL_Renderer *renderer, TTF_Font *font, char *str, int x, int y, int w, int h, int r, int g, int b)
+void printText(SDL_Renderer *renderer, TTF_Font *font, char *str, int x, int y, int h, int r, int g, int b)
   {
     SDL_Color c = {r, g, b, 255};
 
     SDL_Surface *s = TTF_RenderText_Solid(font, str, c);
     SDL_Texture *t = SDL_CreateTextureFromSurface(renderer, s);
 
-    SDL_Rect rect = {x, y, w, h};
+    SDL_Rect rect = {x, y, strlen(str) * (h / 2), h};
 
     SDL_RenderCopy(renderer, t, NULL, &rect);
   }
@@ -54,6 +55,9 @@ int editor(SDL_Renderer *renderer, SDL_Event event, TTF_Font *font, int map_w, i
                 case SDL_KEYDOWN:
                   switch(event.key.keysym.sym)
                     {
+                      case SDLK_ESCAPE:
+                        return 0;
+                        break;
                       case SDLK_1:
                         type = 1;
                         break;
@@ -117,7 +121,7 @@ int editor(SDL_Renderer *renderer, SDL_Event event, TTF_Font *font, int map_w, i
               }
           }
         sprintf(ty, "Current Type: %i", type);
-        printText(renderer, font, ty, (WINDOW_SIDE / 2) - 100, 0, 200, 40, 255, 255, 255);
+        printText(renderer, font, ty, (WINDOW_SIDE / 2) - 100, 0, 40, 255, 255, 255);
         SDL_RenderPresent(renderer);
         int ticks = startFrame - SDL_GetTicks();
         if(ticks < ticksPerFrame)
@@ -130,12 +134,15 @@ void save(SDL_Renderer *renderer, SDL_Event event, TTF_Font *font, int map_w, in
   {
     int framerate = 30, ticksPerFrame = 1000/framerate, startFrame = 0, len = 0;
     bool done = false;
-    char text[64] = "", *filename;
+    char text[64] = "", filename_disp[64], filename[64];
+    FILE *f;
     SDL_StartTextInput();
     while(!done)
       {
         startFrame = SDL_GetTicks();
         SDL_RenderClear(renderer);
+
+        sprintf(filename_disp, "%s.map", text);
 
         while(SDL_PollEvent(&event))
           {
@@ -153,23 +160,39 @@ void save(SDL_Renderer *renderer, SDL_Event event, TTF_Font *font, int map_w, in
                         break;
                       case SDLK_RETURN:
                         // Save the map to file with name text
-                        FILE *f = fopen(text, "W");
-                        fprintf(f, "poobie");
-                        fclose(f);
+                        f = fopen(filename, "r");
+                        if(f == NULL)
+                        {
+                          printf("here\n");
+                          sprintf(filename, "./maps/%s", filename_disp);
+                          f = fopen(filename, "w");
+                          fprintf(f, "%i %i\n", map_w, map_h);
+                          for(int y = 0;y < map_h;y++)
+                          {
+                            for(int x = 0;x < map_w;x++)
+                            {
+                              if(x < map_w - 1)
+                                fprintf(f, "|%i", map[x][y].type);
+                              else
+                                fprintf(f, "|%i|", map[x][y].type);
+                            }
+                            fprintf(f, "\n");
+                          }
+                          fclose(f);
+                        }
                         break;
                     }
                   break;
                 case SDL_TEXTINPUT:
-                  if(len < 20)
+                  if(strlen(text)<15)
                     {
                       strcat(text, event.text.text);
-                      len++;
                     }
                   break;
               }
           }
-        sprintf(filename, 64, "%s.txt", text);
-        printText(renderer, font, filename, 0, 0, 400, 100, 255, 255, 255);
+        //sprintf(filename, 64, "%s.txt", text);
+        printText(renderer, font, filename_disp, 0, 0, 100, 255, 255, 255);
 
         SDL_RenderPresent(renderer);
         int ticks = startFrame - SDL_GetTicks();
@@ -197,6 +220,11 @@ int main()
     while(s != 0)
       {
         s = editor(renderer, event, font, map_w, map_h, map);
-        save(renderer, event, font, map_w, map_h, map);
+        if(s == 1)
+          save(renderer, event, font, map_w, map_h, map);
       }
+
+    TTF_Quit();
+    SDL_Quit();
+    return 0;
 }
